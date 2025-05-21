@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# Bug Bounty Arsenal Framework
+# Author: Inayat Hussain (Security Researcher)
+# Purpose: Install, manage, and run bug bounty tools in one framework
+
+GREEN="\033[1;32m"
+RED="\033[1;31m"
+YELLOW="\033[1;33m"
+CYAN="\033[1;36m"
+RESET="\033[0m"
+
+TOOLS_GO=(
+  subfinder
+  httpx
+  nuclei
+  waybackurls
+  gf
+  hakrawler
+  dalfox
+  qsreplace
+  assetfinder
+  shuffledns
+  uncover
+  dnsx
+  naabu
+  katana
+  interactsh-client
+)
+
+TOOLS_APT=(
+  jq
+  nmap
+  git
+  python3
+  python3-pip
+  whois
+  dnsutils
+  tmux
+  amass
+)
+
+TOOLS_PIP=(
+  uro
+  arjun
+  git-dumper
+  waymore
+)
+
+BANNER() {
+    echo -e "${GREEN}"
+    echo "╔══════════════════════════════════════════════════╗"
+    echo "║     Bug Bounty Arsenal Framework Installer       ║"
+    echo "║      Author: Inayat Hussain (Security Researcher)║"
+    echo "╚══════════════════════════════════════════════════╝"
+    echo -e "${RESET}"
+}
+
+check_and_install_apt() {
+    for tool in "${TOOLS_APT[@]}"; do
+        if ! dpkg -s "$tool" >/dev/null 2>&1; then
+            echo -e "${YELLOW}[*] Installing $tool via APT...${RESET}"
+            sudo apt install -y "$tool"
+        else
+            echo -e "${GREEN}[+] $tool already installed (APT).${RESET}"
+        fi
+    done
+}
+
+install_go_if_needed() {
+    if ! command -v go >/dev/null 2>&1; then
+        echo -e "${RED}[!] Go not found. Installing Go...${RESET}"
+        sudo apt update
+        sudo apt install -y golang
+        echo "export PATH=\$PATH:\$HOME/go/bin" >> ~/.bashrc
+        source ~/.bashrc
+    else
+        echo -e "${GREEN}[+] Go already installed.${RESET}"
+    fi
+}
+
+check_and_install_go_tools() {
+    for tool in "${TOOLS_GO[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo -e "${YELLOW}[*] Installing $tool via go install...${RESET}"
+            go install github.com/projectdiscovery/$tool/cmd/$tool@latest 2>/dev/null || \
+            go install github.com/tomnomnom/$tool@latest 2>/dev/null
+        else
+            echo -e "${GREEN}[+] $tool already installed (Go).${RESET}"
+        fi
+    done
+    export PATH=$PATH:$(go env GOPATH)/bin
+    echo 'export PATH=$PATH:$HOME/go/bin' >> ~/.bashrc
+}
+
+check_and_install_pip_tools() {
+    for tool in "${TOOLS_PIP[@]}"; do
+        if ! pip3 show "$tool" >/dev/null 2>&1; then
+            echo -e "${YELLOW}[*] Installing $tool via pip3...${RESET}"
+            pip3 install "$tool"
+        else
+            echo -e "${GREEN}[+] $tool already installed (pip3).${RESET}"
+        fi
+    done
+}
+
+install_shodan() {
+    if ! command -v shodan >/dev/null 2>&1; then
+        echo -e "${YELLOW}[*] Installing Shodan CLI...${RESET}"
+        pip3 install shodan
+    else
+        echo -e "${GREEN}[+] Shodan CLI already installed.${RESET}"
+    fi
+}
+
+install_additional_tools() {
+    if [ ! -d "$HOME/.gf" ]; then
+        echo -e "${YELLOW}[*] Setting up GF patterns...${RESET}"
+        mkdir -p ~/.gf
+        git clone https://github.com/1ndianl33t/Gf-Patterns ~/.gf-patterns
+        cp ~/.gf-patterns/*.json ~/.gf/
+    fi
+
+    if [ ! -d "$HOME/tools/dirsearch" ]; then
+        echo -e "${YELLOW}[*] Installing dirsearch...${RESET}"
+        mkdir -p ~/tools && cd ~/tools
+        git clone https://github.com/maurosoria/dirsearch.git
+    else
+        echo -e "${GREEN}[+] dirsearch already installed.${RESET}"
+    fi
+}
+
+run_tool_menu() {
+    echo -e "\n${CYAN}Available Tools to Run:${RESET}"
+    select tool in subfinder httpx nuclei waybackurls assetfinder hakrawler dalfox gf \
+        amass arjun qsreplace naabu dnsx uncover shuffledns katana shodan dirsearch Exit; do
+        case $tool in
+            Exit) break ;;
+            dirsearch)
+                if [ -f "$HOME/tools/dirsearch/dirsearch.py" ]; then
+                    python3 "$HOME/tools/dirsearch/dirsearch.py"
+                else
+                    echo -e "${RED}[!] dirsearch not found.${RESET}"
+                fi
+                ;;
+            "")
+                echo -e "${RED}Invalid choice!${RESET}" ;;
+            *)
+                TOOL_PATH=$(command -v "$tool" 2>/dev/null)
+                if [ -n "$TOOL_PATH" ]; then
+                    echo -e "${YELLOW}[*] Running: $tool${RESET}"
+                    "$TOOL_PATH"
+                else
+                    echo -e "${RED}[!] $tool not found in PATH.${RESET}"
+                fi
+                ;;
+        esac
+    done
+}
+
+# ============ EXECUTE ============
+
+BANNER
+sudo apt update && sudo apt upgrade -y
+install_go_if_needed
+check_and_install_apt
+check_and_install_go_tools
+check_and_install_pip_tools
+install_additional_tools
+install_shodan
+
+echo -e "${GREEN}[✔] All tools installed or already present.${RESET}"
+echo -e "${CYAN}[!] Launching tool menu...${RESET}"
+run_tool_menu
+
